@@ -219,6 +219,10 @@ export interface ReceivePurchaseOrderResult {
   message: string;
   purchaseOrderId?: string;
   status?: string;
+  receiptId?: string;
+  receiptNumber?: string;
+  totalQuantity?: number;
+  totalValue?: number;
 }
 
 export async function receivePurchaseOrder(
@@ -265,10 +269,29 @@ export async function receivePurchaseOrder(
 
   const result = Array.isArray(data) ? data[0] : data;
 
+  if (!result?.success) {
+    return {
+      success: false,
+      message: result?.message ?? "The purchase receipt was not completed.",
+      purchaseOrderId: result?.purchaseOrderId ?? purchaseOrderId,
+      status: result?.status,
+      receiptId: result?.receiptId,
+      receiptNumber: result?.receiptNumber,
+      totalQuantity: Number(result?.totalQuantity ?? 0),
+      totalValue: Number(result?.totalValue ?? 0),
+    };
+  }
+
   return {
     success: true,
-    message: result?.message ?? "Goods received successfully.",
-    purchaseOrderId: result?.purchase_order_id ?? purchaseOrderId,
-    status: result?.status,
+    message: result.receiptNumber
+      ? `Goods received successfully. GRN ${result.receiptNumber} created.`
+      : "Goods received successfully.",
+    purchaseOrderId: result.purchaseOrderId ?? purchaseOrderId,
+    status: result.status,
+    receiptId: result.receiptId,
+    receiptNumber: result.receiptNumber,
+    totalQuantity: Number(result.totalQuantity ?? 0),
+    totalValue: Number(result.totalValue ?? 0),
   };
 }
