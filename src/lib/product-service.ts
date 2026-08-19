@@ -23,6 +23,17 @@ interface SupplierOption {
   status: string | null;
 }
 
+export interface ProductPriceAnalysis {
+  costPrice: number;
+  sellingPrice: number;
+  grossProfit: number;
+  grossMarginPercent: number;
+  markupPercent: number;
+  targetPriceAt25Margin: number;
+  targetPriceAt30Margin: number;
+  targetPriceAt35Margin: number;
+}
+
 const TABLE_NAME = "products";
 
 function mapProductRow(row: ProductRow): Product {
@@ -62,6 +73,30 @@ function toProductRow(product: Product) {
   };
 }
 
+function priceForMargin(cost: number, marginPercent: number) {
+  if (cost <= 0 || marginPercent >= 100) return 0;
+  return cost / (1 - marginPercent / 100);
+}
+
+export function analyseProductPricing(costPrice: number, sellingPrice: number): ProductPriceAnalysis {
+  const cost = Math.max(0, Number(costPrice) || 0);
+  const selling = Math.max(0, Number(sellingPrice) || 0);
+  const grossProfit = selling - cost;
+  const grossMarginPercent = selling > 0 ? (grossProfit / selling) * 100 : 0;
+  const markupPercent = cost > 0 ? (grossProfit / cost) * 100 : 0;
+
+  return {
+    costPrice: cost,
+    sellingPrice: selling,
+    grossProfit,
+    grossMarginPercent,
+    markupPercent,
+    targetPriceAt25Margin: priceForMargin(cost, 25),
+    targetPriceAt30Margin: priceForMargin(cost, 30),
+    targetPriceAt35Margin: priceForMargin(cost, 35),
+  };
+}
+
 export async function getProducts(): Promise<Product[]> {
   const { data, error } = await supabase.from(TABLE_NAME).select("*").order("updated_at", { ascending: false });
   if (error) throw error;
@@ -75,10 +110,7 @@ export async function getProductById(id: string): Promise<Product | undefined> {
 }
 
 export async function getSupplierOptions(): Promise<SupplierOption[]> {
-  const { data, error } = await supabase
-    .from("suppliers")
-    .select("id, company, status")
-    .order("company", { ascending: true });
+  const { data, error } = await supabase.from("suppliers").select("id, company, status").order("company", { ascending: true });
   if (error) throw error;
   return (data ?? []) as SupplierOption[];
 }
