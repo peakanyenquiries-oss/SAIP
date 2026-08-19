@@ -12,8 +12,15 @@ interface ProductRow {
   cost_price: number | null;
   stock: number | null;
   minimum_stock?: number | null;
+  supplier_id?: string | null;
   created_at: string | null;
   updated_at: string | null;
+}
+
+interface SupplierOption {
+  id: string;
+  company: string;
+  status: string | null;
 }
 
 const TABLE_NAME = "products";
@@ -25,7 +32,7 @@ function mapProductRow(row: ProductRow): Product {
     name: row.product_name ?? "",
     brand: row.brand ?? "",
     category: row.category ?? "",
-    supplierId: "",
+    supplierId: row.supplier_id ?? "",
     costPrice: Number(row.cost_price ?? 0),
     sellingPrice: Number(row.selling_price ?? 0),
     quantity: Number(row.stock ?? 0),
@@ -49,6 +56,7 @@ function toProductRow(product: Product) {
     cost_price: product.costPrice,
     stock: product.quantity,
     minimum_stock: product.minimumStock,
+    supplier_id: product.supplierId || null,
     created_at: product.createdAt || new Date().toISOString(),
     updated_at: product.updatedAt || new Date().toISOString(),
   };
@@ -66,6 +74,15 @@ export async function getProductById(id: string): Promise<Product | undefined> {
   return data ? mapProductRow(data as ProductRow) : undefined;
 }
 
+export async function getSupplierOptions(): Promise<SupplierOption[]> {
+  const { data, error } = await supabase
+    .from("suppliers")
+    .select("id, company, status")
+    .order("company", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as SupplierOption[];
+}
+
 export async function addProduct(product: Product): Promise<Product> {
   const { data, error } = await supabase.from(TABLE_NAME).insert(toProductRow(product)).select().single();
   if (error) throw error;
@@ -73,18 +90,7 @@ export async function addProduct(product: Product): Promise<Product> {
 }
 
 export async function updateProduct(product: Product): Promise<Product> {
-  const { data, error } = await supabase.from(TABLE_NAME).update({
-    sku: product.sku || null,
-    product_name: product.name,
-    brand: product.brand || null,
-    category: product.category || null,
-    oem_number: product.barcode || null,
-    selling_price: product.sellingPrice,
-    cost_price: product.costPrice,
-    stock: product.quantity,
-    minimum_stock: product.minimumStock,
-    updated_at: product.updatedAt || new Date().toISOString(),
-  }).eq("id", product.id).select().single();
+  const { data, error } = await supabase.from(TABLE_NAME).update(toProductRow(product)).eq("id", product.id).select().single();
   if (error) throw error;
   return mapProductRow(data as ProductRow);
 }
