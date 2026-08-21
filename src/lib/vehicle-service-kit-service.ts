@@ -75,7 +75,11 @@ export async function getVehicleServiceKitRecommendations(vehicleVariantId: stri
 
   return ((data ?? []) as any[]).map((rule) => {
     const items = rule.service_kit.items.map((item: any) => {
-      const fitment = (item.product.fitments ?? []).find((f: any) => f.vehicle_variant_id === vehicleVariantId);
+      const fitments = item.product.fitments ?? [];
+      const fitment = fitments
+        .filter((candidate: any) => candidate.vehicle_variant_id === vehicleVariantId)
+        .sort((a: any, b: any) => String(b.verified_at ?? "").localeCompare(String(a.verified_at ?? "")))[0];
+
       return {
         productId: item.product_id,
         sku: item.product.sku,
@@ -104,10 +108,10 @@ export async function getVehicleServiceKitRecommendations(vehicleVariantId: stri
       serviceKitId: rule.service_kit.id,
       serviceKitName: rule.service_kit.name,
       serviceType: rule.service_kit.service_type,
-      intervalKm: rule.interval_km,
-      intervalMonths: rule.interval_months,
-      priority: rule.priority,
-      notes: rule.notes,
+      intervalKm: rule.interval_km == null ? null : Number(rule.interval_km),
+      intervalMonths: rule.interval_months == null ? null : Number(rule.interval_months),
+      priority: Number(rule.priority ?? 0),
+      notes: rule.notes ?? null,
       items,
       totalCost,
       totalSellingPrice,
