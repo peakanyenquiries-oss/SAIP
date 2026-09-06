@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase/client";
+import { fetchVehicleServiceKitRules } from "@/repositories/vehicle-service-kit.repository";
 
 export interface VehicleServiceKitRecommendation {
   vehicleVariantId: string;
@@ -28,96 +28,61 @@ export interface VehicleServiceKitRecommendation {
   totalSellingPrice: number;
   grossProfit: number;
   grossMarginPercent: number;
-  readyToSell: boolean;
+  readyForService: boolean;
 }
 
 export async function getVehicleServiceKitRecommendations(vehicleVariantId: string): Promise<VehicleServiceKitRecommendation[]> {
-  const { data, error } = await supabase
-    .from("saip_vehicle_service_kits")
-    .select(`
-      id,
-      interval_km,
-      interval_months,
-      priority,
-      notes,
-      service_kit:saip_service_kits!inner(
-        id,
-        name,
-        service_type,
-        active,
-        items:saip_service_kit_items!inner(
-          product_id,
-          quantity,
-          required,
-          product:products!inner(
-            sku,
-            product_name,
-            cost_price,
-            selling_price,
-            stock,
-            minimum_stock,
-            supplier:suppliers(company),
-            fitments:saip_product_fitments(
-              vehicle_variant_id,
-              fitment_type,
-              verified_at
-            )
-          )
-        )
-      )
-    `)
-    .eq("vehicle_variant_id", vehicleVariantId)
-    .eq("active", true)
-    .eq("service_kit.active", true)
-    .order("priority");
+  const rules = await fetchVehicleServiceKitRules(vehicleVariantId);
 
-  if (error) throw error;
-
-  return ((data ?? []) as any[]).map((rule) => {
-    const items = rule.service_kit.items.map((item: any) => {
-      const fitments = item.product.fitments ?? [];
-      const fitment = fitments
-        .filter((candidate: any) => candidate.vehicle_variant_id === vehicleVariantId)
-        .sort((a: any, b: any) => String(b.verified_at ?? "").localeCompare(String(a.verified_at ?? "")))[0];
+  return rules.map((rule) => {
+    const items = rule.serviceKit.items.map((item) => {
+      const fitment = item.product.fitments
+        .filter((candidate) => candidate.vehicleVariantId === vehicleVariantId)
+        .sort((a, b) => String(b.verifiedAt ?? "").localeCompare(String(a.verifiedAt ?? "")))[0];
 
       return {
-        productId: item.product_id,
+        productId: item.productId,
         sku: item.product.sku,
-        productName: item.product.product_name,
-        quantity: Number(item.quantity),
-        required: Boolean(item.required),
+        productName: item.product.productName,
+        quantity: item.quantity,
+        required: item.required,
         compatible: Boolean(fitment),
-        fitmentType: fitment?.fitment_type ?? null,
-        verifiedAt: fitment?.verified_at ?? null,
+        fitmentType: fitment?.fitmentType ?? null,
+        verifiedAt: fitment?.verifiedAt ?? null,
         stock: Number(item.product.stock ?? 0),
-        minimumStock: Number(item.product.minimum_stock ?? 0),
-        supplierName: item.product.supplier?.company ?? null,
-        costPrice: Number(item.product.cost_price ?? 0),
-        sellingPrice: Number(item.product.selling_price ?? 0),
+        minimumStock: Number(item.product.minimumStock ?? 0),
+        supplierName: item.product.supplierName,
+        costPrice: Number(item.product.costPrice ?? 0),
+        sellingPrice: Number(item.product.sellingPrice ?? 0),
       };
     });
 
-    const totalCost = items.reduce((sum: number, item: any) => sum + item.costPrice * item.quantity, 0);
-    const totalSellingPrice = items.reduce((sum: number, item: any) => sum + item.sellingPrice * item.quantity, 0);
+    const totalCost = items.reduce((sum, item) => sum + item.costPrice * item.quantity, 0);
+    const totalSellingPrice = items.reduce((sum, item) => sum + item.sellingPrice * item.quantity, 0);
     const grossProfit = totalSellingPrice - totalCost;
     const grossMarginPercent = totalSellingPrice > 0 ? (grossProfit / totalSellingPrice) * 100 : 0;
-    const readyToSell = items.filter((item: any) => item.required).every((item: any) => item.compatible && item.stock >= item.quantity);
+    const readyForService = items.filter((item) => item.required).every((item) => item.compatible && item.stock >= item.quantity);
 
     return {
       vehicleVariantId,
-      serviceKitId: rule.service_kit.id,
-      serviceKitName: rule.service_kit.name,
-      serviceType: rule.service_kit.service_type,
-      intervalKm: rule.interval_km == null ? null : Number(rule.interval_km),
-      intervalMonths: rule.interval_months == null ? null : Number(rule.interval_months),
-      priority: Number(rule.priority ?? 0),
-      notes: rule.notes ?? null,
+      serviceKitId: rule.serviceKit.id,
+      serviceKitName: rule.serviceKit.name,
+      serviceType: rule.serviceKit.serviceType,
+      intervalKm: rule.intervalKm,
+      intervalMonths: rule.intervalMonths,
+      priority: rule.priority,
+      notes: rule.notes,
       items,
       totalCost,
       totalSellingPrice,
       grossProfit,
       grossMarginPercent,
-      readyToSell,
+      readyForService,
     };
   });
+}
+
+export async function getVehicleServiceKitRecommendation(vehicleVariantId: string, serviceKitId: string): Promise<VehicleServiceKitRecommendation | null> {
+  const recommendations = await getVehicleServiceKitRecommendations(vehicleVariantId);
+  return recommendations.find((recommendation) => recommendation.serviceKitId === serviceKitId) ?? null;
 }
