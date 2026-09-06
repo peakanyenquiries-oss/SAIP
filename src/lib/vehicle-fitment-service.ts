@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase/client";
+import { fetchCompatibleProducts, fetchVehicleVariants } from "@/repositories/vehicle-fitment.repository";
 
 export interface VehicleVariant {
   id: string;
@@ -31,27 +31,8 @@ export interface CompatibleProduct {
 }
 
 export async function getVehicleVariants(): Promise<VehicleVariant[]> {
-  const { data, error } = await supabase
-    .from("saip_vehicle_variants")
-    .select(`
-      id,
-      model_type,
-      engine_code,
-      engine_cc,
-      power_kw,
-      year_from_month,
-      year_to_month,
-      model:saip_vehicle_models!inner(
-        model_name,
-        generation,
-        make:saip_vehicle_makes!inner(make_name)
-      )
-    `)
-    .order("model_type");
-
-  if (error) throw error;
-
-  return ((data ?? []) as any[]).map((row) => ({
+  const rows = await fetchVehicleVariants();
+  return rows.map((row) => ({
     id: row.id,
     make: row.model.make.make_name,
     model: row.model.model_name,
@@ -66,32 +47,8 @@ export async function getVehicleVariants(): Promise<VehicleVariant[]> {
 }
 
 export async function getCompatibleProducts(vehicleVariantId: string): Promise<CompatibleProduct[]> {
-  const { data, error } = await supabase
-    .from("saip_product_fitments")
-    .select(`
-      id,
-      fitment_type,
-      verified_at,
-      notes,
-      product:products!inner(
-        id,
-        sku,
-        product_name,
-        brand,
-        cost_price,
-        selling_price,
-        stock,
-        minimum_stock,
-        supplier_id,
-        supplier:suppliers(company)
-      )
-    `)
-    .eq("vehicle_variant_id", vehicleVariantId)
-    .order("verified_at", { ascending: false, nullsFirst: false });
-
-  if (error) throw error;
-
-  return ((data ?? []) as any[]).map((row) => ({
+  const rows = await fetchCompatibleProducts(vehicleVariantId);
+  return rows.map((row) => ({
     fitmentId: row.id,
     productId: row.product.id,
     sku: row.product.sku,
