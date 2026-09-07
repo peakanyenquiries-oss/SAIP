@@ -31,13 +31,14 @@ export interface ProductFitmentRow {
     minimum_stock: number | null;
     supplier_id: string | null;
     supplier: { company: string } | null;
-    procurement_recommendation: {
+    procurement_recommendations: Array<{
       id: string;
       recommended_supplier_id: string | null;
       reason: string;
       score: number | string;
+      created_at: string | null;
       recommended_supplier: { company: string } | null;
-    } | null;
+    }>;
     supplier_options: Array<{
       supplier_id: string;
       unit_cost: number | string;
@@ -90,11 +91,12 @@ export async function fetchCompatibleProducts(vehicleVariantId: string): Promise
         minimum_stock,
         supplier_id,
         supplier:suppliers(company),
-        procurement_recommendation:saip_procurement_recommendations!saip_procurement_recommendations_product_id_fkey(
+        procurement_recommendations:saip_procurement_recommendations!saip_procurement_recommendations_product_id_fkey(
           id,
           recommended_supplier_id,
           reason,
           score,
+          created_at,
           recommended_supplier:suppliers(company)
         ),
         supplier_options:product_suppliers(
