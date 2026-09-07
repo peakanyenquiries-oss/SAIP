@@ -62,8 +62,14 @@ export async function getVehicleVariants(): Promise<VehicleVariant[]> {
 
 export async function getCompatibleProducts(vehicleVariantId: string): Promise<CompatibleProduct[]> {
   const rows = await fetchCompatibleProducts(vehicleVariantId);
+
   return rows.map((row) => {
-    const recommendation = row.product.procurement_recommendation;
+    const recommendation = [...(row.product.procurement_recommendations ?? [])]
+      .sort((a, b) => {
+        const scoreDifference = Number(b.score ?? 0) - Number(a.score ?? 0);
+        if (scoreDifference !== 0) return scoreDifference;
+        return String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""));
+      })[0] ?? null;
 
     return {
       fitmentId: row.id,
