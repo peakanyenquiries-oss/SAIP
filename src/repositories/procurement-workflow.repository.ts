@@ -41,10 +41,10 @@ export type ProcurementRequest = {
   updated_at: string;
 };
 
-export async function getReplenishmentRecommendations(): Promise<ProcurementRecommendation[]> {
+export async function getReplenishmentRecommendations(productId: string | null = null): Promise<ProcurementRecommendation[]> {
   const { data, error } = await supabase.rpc(
     "saip_get_replenishment_recommendations",
-    { p_product_id: null }
+    { p_product_id: productId }
   );
 
   if (error) throw error;
@@ -73,6 +73,11 @@ export async function getReplenishmentRecommendations(): Promise<ProcurementReco
     recommendation: row.recommendation,
     rationale: String(row.rationale ?? ""),
   }));
+}
+
+export async function getProcurementRecommendationForProduct(productId: string): Promise<ProcurementRecommendation | null> {
+  const recommendations = await getReplenishmentRecommendations(productId);
+  return recommendations.find((recommendation) => recommendation.product_id === productId) ?? recommendations[0] ?? null;
 }
 
 export async function getProcurementRequests(): Promise<ProcurementRequest[]> {
@@ -113,10 +118,8 @@ export async function getProcurementRequests(): Promise<ProcurementRequest[]> {
     recommended_supplier_id: row.recommended_supplier_id ?? null,
     supplier_name: row.suppliers?.company ?? null,
     decision_score: row.decision_score == null ? null : Number(row.decision_score),
-    recommended_landed_cost:
-      row.recommended_landed_cost == null ? null : Number(row.recommended_landed_cost),
-    recommended_selling_price:
-      row.recommended_selling_price == null ? null : Number(row.recommended_selling_price),
+    recommended_landed_cost: row.recommended_landed_cost == null ? null : Number(row.recommended_landed_cost),
+    recommended_selling_price: row.recommended_selling_price == null ? null : Number(row.recommended_selling_price),
     rationale: row.rationale ?? null,
     purchase_order_id: row.purchase_order_id ?? null,
     created_at: row.created_at,
@@ -124,43 +127,25 @@ export async function getProcurementRequests(): Promise<ProcurementRequest[]> {
   }));
 }
 
-export async function createProcurementRequest(
-  productId: string,
-  quantity: number
-): Promise<string> {
-  const { data, error } = await supabase.rpc(
-    "saip_create_procurement_request",
-    {
-      p_product_id: productId,
-      p_quantity: Math.floor(Number(quantity)),
-    }
-  );
-
+export async function createProcurementRequest(productId: string, quantity: number): Promise<string> {
+  const { data, error } = await supabase.rpc("saip_create_procurement_request", {
+    p_product_id: productId,
+    p_quantity: Math.floor(Number(quantity)),
+  });
   if (error) throw error;
   return String(data);
 }
 
 export async function approveProcurementRequest(requestId: string): Promise<void> {
-  const { error } = await supabase.rpc(
-    "saip_approve_procurement_request",
-    { p_request_id: requestId }
-  );
-
+  const { error } = await supabase.rpc("saip_approve_procurement_request", { p_request_id: requestId });
   if (error) throw error;
 }
 
-export async function convertApprovedProcurementRequestToPo(
-  requestId: string,
-  createdBy = "SAIP User"
-): Promise<string> {
-  const { data, error } = await supabase.rpc(
-    "saip_convert_approved_procurement_request_to_po",
-    {
-      p_request_id: requestId,
-      p_created_by: createdBy,
-    }
-  );
-
+export async function convertApprovedProcurementRequestToPo(requestId: string, createdBy = "SAIP User"): Promise<string> {
+  const { data, error } = await supabase.rpc("saip_convert_approved_procurement_request_to_po", {
+    p_request_id: requestId,
+    p_created_by: createdBy,
+  });
   if (error) throw error;
   return String(data);
 }
