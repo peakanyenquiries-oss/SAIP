@@ -1,4 +1,5 @@
 import { fetchVehicleServiceKitRules } from "@/repositories/vehicle-service-kit.repository";
+import { getProcurementRecommendationForProduct } from "@/repositories/procurement-workflow.repository";
 
 export interface VehicleServiceKitRecommendation {
   vehicleVariantId: string;
@@ -23,6 +24,15 @@ export interface VehicleServiceKitRecommendation {
     supplierName: string | null;
     costPrice: number;
     sellingPrice: number;
+    procurement: {
+      recommendation: "ORDER_NOW" | "EXPEDITE_REVIEW" | "MONITOR" | null;
+      supplierName: string | null;
+      supplierScore: number;
+      recommendedQuantity: number;
+      orderValue: number;
+      leadTimeDays: number;
+      rationale: string | null;
+    } | null;
   }>;
   totalCost: number;
   totalSellingPrice: number;
@@ -34,11 +44,13 @@ export interface VehicleServiceKitRecommendation {
 export async function getVehicleServiceKitRecommendations(vehicleVariantId: string): Promise<VehicleServiceKitRecommendation[]> {
   const rules = await fetchVehicleServiceKitRules(vehicleVariantId);
 
-  return rules.map((rule) => {
-    const items = rule.serviceKit.items.map((item) => {
+  return Promise.all(rules.map(async (rule) => {
+    const items = await Promise.all(rule.serviceKit.items.map(async (item) => {
       const fitment = item.product.fitments
         .filter((candidate) => candidate.vehicleVariantId === vehicleVariantId)
         .sort((a, b) => String(b.verifiedAt ?? "").localeCompare(String(a.verifiedAt ?? "")))[0];
+
+      const procurement = await getProcurementRecommendationForProduct(item.productId);
 
       return {
         productId: item.productId,
@@ -54,8 +66,17 @@ export async function getVehicleServiceKitRecommendations(vehicleVariantId: stri
         supplierName: item.product.supplierName,
         costPrice: Number(item.product.costPrice ?? 0),
         sellingPrice: Number(item.product.sellingPrice ?? 0),
+        procurement: procurement ? {
+          recommendation: procurement.recommendation ?? null,
+          supplierName: procurement.supplier_name,
+          supplierScore: procurement.supplier_score,
+          recommendedQuantity: procurement.recommended_order_quantity,
+          orderValue: procurement.recommended_order_value,
+          leadTimeDays: procurement.lead_time_days,
+          rationale: procurement.rationale || null,
+        } : null,
       };
-    });
+    }));
 
     const totalCost = items.reduce((sum, item) => sum + item.costPrice * item.quantity, 0);
     const totalSellingPrice = items.reduce((sum, item) => sum + item.sellingPrice * item.quantity, 0);
@@ -79,7 +100,7 @@ export async function getVehicleServiceKitRecommendations(vehicleVariantId: stri
       grossMarginPercent,
       readyForService,
     };
-  });
+  }));
 }
 
 export async function getVehicleServiceKitRecommendation(vehicleVariantId: string, serviceKitId: string): Promise<VehicleServiceKitRecommendation | null> {
