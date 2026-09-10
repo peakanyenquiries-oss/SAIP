@@ -25,7 +25,7 @@ export interface VehicleServiceKitRecommendation {
     costPrice: number;
     sellingPrice: number;
     procurement: {
-      recommendation: "ORDER_NOW" | "EXPEDITE_REVIEW" | "MONITOR" | null;
+      recommendation: "ORDER_NOW" | "EXPEDITE_REVIEW" | "MONITOR";
       supplierName: string | null;
       supplierScore: number;
       recommendedQuantity: number;
@@ -67,7 +67,7 @@ export async function getVehicleServiceKitRecommendations(vehicleVariantId: stri
         costPrice: Number(item.product.costPrice ?? 0),
         sellingPrice: Number(item.product.sellingPrice ?? 0),
         procurement: procurement ? {
-          recommendation: procurement.recommendation ?? null,
+          recommendation: procurement.recommendation ?? "MONITOR",
           supplierName: procurement.supplier_name,
           supplierScore: procurement.supplier_score,
           recommendedQuantity: procurement.recommended_order_quantity,
